@@ -29,35 +29,25 @@ class AwsS3Uploader {
 
     /// The AWS region. Must be formatted correctly, e.g. us-west-1
     required String region,
+
+    /// Optional custom S3 endpoint URL. If not provided, defaults to 'https://$bucket.s3-$region.amazonaws.com'
+    String? endpoint,
   }) async {
-    final endpoint = 'https://$bucket.s3-$region.amazonaws.com';
+    final effectiveEndpoint = endpoint ?? 'https://$bucket.s3-$region.amazonaws.com';
 
     final stream = http.ByteStream(Stream.castFrom(file.openRead()));
     final length = await file.length();
 
-    final uri = Uri.parse(endpoint);
+    final uri = Uri.parse(effectiveEndpoint);
     final req = http.MultipartRequest("POST", uri);
-    final multipartFile = http.MultipartFile(
-      'file',
-      stream,
-      length,
-      filename: path.basename(file.path),
-    );
+    final multipartFile = http.MultipartFile('file', stream, length,
+        filename: path.basename(file.path));
 
     final policy = Policy.fromS3PresignedPost(
-      uploadDst,
-      bucket,
-      accessKey,
-      15,
-      length,
-      region: region,
-    );
-    final key = SigV4.calculateSigningKey(
-      secretKey,
-      policy.datetime,
-      region,
-      's3',
-    );
+        uploadDst, bucket, accessKey, 15, length,
+        region: region);
+    final key =
+        SigV4.calculateSigningKey(secretKey, policy.datetime, region, 's3');
     final signature = SigV4.calculateSignature(key, policy.encode());
 
     req.files.add(multipartFile);
@@ -78,7 +68,7 @@ class AwsS3Uploader {
         );
       }
 
-      if (res.statusCode == 204) return '$endpoint/$uploadDst';
+      if (res.statusCode == 204) return '$effectiveEndpoint/$uploadDst';
     } catch (e) {
       stderr.writeln('Failed to upload to AWS, with exception:');
       stderr.writeln(e);
@@ -110,8 +100,11 @@ class AwsS3Uploader {
     /// The filename to upload as. If null, defaults to the given file's current filename.
     required String uploadDst,
     bool public = true,
+
+    /// Optional custom S3 endpoint URL. If not provided, defaults to 'https://$bucket.s3-$region.amazonaws.com'
+    String? endpoint,
   }) async {
-    final endpoint = 'https://$bucket.s3-$region.amazonaws.com';
+    final effectiveEndpoint = endpoint ?? 'https://$bucket.s3-$region.amazonaws.com';
     // final uploadDest = '$destDir/${filename ?? path.basename(file.path)}';
 
     final stream = http.ByteStream.fromBytes(data.buffer.asUint8List());
@@ -119,30 +112,16 @@ class AwsS3Uploader {
     // final stream = http.ByteStream(Stream.castFrom(file.openRead()));
     final length = data.lengthInBytes;
 
-    final uri = Uri.parse(endpoint);
+    final uri = Uri.parse(effectiveEndpoint);
     final req = http.MultipartRequest("POST", uri);
-    final multipartFile = http.MultipartFile(
-      'file',
-      stream,
-      length,
-      filename: path.basename(uploadDst),
-    );
+    final multipartFile = http.MultipartFile('file', stream, length,
+        filename: path.basename(uploadDst));
 
     final policy = Policy.fromS3PresignedPost(
-      uploadDst,
-      bucket,
-      accessKey,
-      15,
-      length,
-      region: region,
-      public: public,
-    );
-    final key = SigV4.calculateSigningKey(
-      secretKey,
-      policy.datetime,
-      region,
-      's3',
-    );
+        uploadDst, bucket, accessKey, 15, length,
+        region: region, public: public);
+    final key =
+        SigV4.calculateSigningKey(secretKey, policy.datetime, region, 's3');
     final signature = SigV4.calculateSignature(key, policy.encode());
 
     req.files.add(multipartFile);
@@ -159,11 +138,10 @@ class AwsS3Uploader {
 
       if (res.statusCode >= 400 && res.statusCode < 500) {
         stderr.writeln(
-          'Failed to upload to AWS, with reason: ${res.reasonPhrase}',
-        );
+            'Failed to upload to AWS, with reason: ${res.reasonPhrase}');
       }
 
-      if (res.statusCode == 204) return '$endpoint/$uploadDst';
+      if (res.statusCode == 204) return '$effectiveEndpoint/$uploadDst';
     } catch (e) {
       stderr.writeln('Failed to upload to AWS, with exception:');
       stderr.writeln(e);
@@ -196,8 +174,11 @@ class AwsS3Uploader {
     Duration expires = const Duration(minutes: 10),
     int maxFileSize = 10 * 1024 * 1024,
     bool public = true,
+
+    /// Optional custom S3 endpoint URL. If not provided, defaults to 'https://$bucket.s3-$region.amazonaws.com'
+    String? endpoint,
   }) async {
-    final endpoint = 'https://$bucket.s3-$region.amazonaws.com';
+    final effectiveEndpoint = endpoint ?? 'https://$bucket.s3-$region.amazonaws.com';
 
     final policy = Policy.fromS3PresignedPost(
       uploadDst,
@@ -208,16 +189,12 @@ class AwsS3Uploader {
       region: region,
       public: public,
     );
-    final key = SigV4.calculateSigningKey(
-      secretKey,
-      policy.datetime,
-      region,
-      's3',
-    );
+    final key =
+        SigV4.calculateSigningKey(secretKey, policy.datetime, region, 's3');
     final signature = SigV4.calculateSignature(key, policy.encode());
 
     var uploadDescriptionData = {
-      'url': endpoint,
+      'url': effectiveEndpoint,
       'type': 'multipart',
       'field': 'file',
       'file-name': path.basename(uploadDst),
